@@ -193,38 +193,67 @@ git status  # shows our local is up-to-date with our remotes
 ```
 
 ## Attempting AP Build
-***The build failed.***
+
+***The build failed. This is after the upstream repository had been updated***
 
 Things I noted watching the build server change realtime:
- 1. A new directory is created with the datestamp when the build runs
+ 1. A new directory is created with the current datestamp when the build runs
     * These should have time added so same-day builds dont overwrite eachother: `$(date +'%F-%H-%M')`
+  
  2. **midbrain.bin** is not getting created during the build process.
+ 
  3. **ap.bin** is getting created, only its not an executable, just a regular file.
- 4. The latest directory is just a pointer to a dated directory, this is not automatically updated.
-    * We put ***latestrr
+ 
+ 4. The latest directory is just a pointer to specific dated directory
+    * This is not automatically updated, not sure if thats intentional, which actually works out better.
+    * I would like to change the ***datestamp/ap.bin*** to ***latest/ap.bin*** for the AP-flash copy/paste command.
+    * ***latest/ap.bin*** is how we will manage what software is getting flashed on the hardware.
+    * That way devs manage pointers in software. Network engineers manage networks.
 
+---
 Things I noted reading the build log:
- 1. .../compile.sh (Permission denied error)
+ 1. ***.../compile.sh (Permission denied error)***
+    * I would venture to say this is causing all the problems were having but please dont quote me.
 
-With this in mind I looked for the most pulled the image from 22-01-25 and flashed that to an AP
- * I ran through the tests, queue accepted both the new SSID and modifying the existing SSID
- * 
+---
+That in mind I looked for the most recent directory with both *ap.bin* and *midbrain.bin* ***binaries*** present.
+ * This was the **22-01-25** directory
 
+I pointed the flashing script at ***22-01-25/ap.bin*** and wrote that to the (non-functional) 192.168.100.116 AP
+ * Going through the AP tests
+   * The queue accepted new SSID's 
+   * Modifications of the existing SSID for that AP.
+   * I was able to connect to the AP from my phone.
 
+Now I just need someone to test it now since im not 100% sure im covering everything.
 
+---
+## Getting Production Stable
+While the build failed we have the build log and a clean state to move forward from.
+ * **Guided only by the build log** we will create one "patch-branch" per error and retry the build.
+ * Rinse and repeat until the errors are resolved.
 
+---
+I would also like to setup a docker engine on an EC2 instance to perform the builds.
+ * Im terrified working on that build server after being informed it has no backups lol.
 
+A safer alternative:
+ * Less wear and tear on our local buildroot server and less risk.
+ * We only need to spin up the instance when were building, and we just load in our buildroot AMI.
+ * I can install my observability tools w/o hosing the build server
+   * For example "VSCode remoteSSH" which allows me to open all files on the build server within my IDE.
+   * This includes all the tools I use within VSCode that reduce user error
 
+In particular a ***c5a.24xlarge*** instance for the follownig reasons:
+| Instance | Hourly-Rate | vCpu | Memory | Storage | Networking |
+|----------|-------------|------|--------|---------|------------|
+| c5a.24xlarge	| $3.696	| 96	| 192 GiB	| EBS Only	| 20 Gigabit |
 
+We can *Ctrl-Alt-Dlt* the build ETA without any additional risk or stress on our infrastructure.
+ * Then we just `scp ec2builder:/new/build/files` the completed images back to our local build server and proceed as usual.
+ * That instance should pay for itself in 1-2 5min builds.
 
-
-
-
-
-
-
-
-
-
-
-
+No modifications to the build environment or tools used for the build process
+ * Just a carbon copy of our buildroot server on EC2.
+ * We dont need the availability so AWS downtime wont affect us there
+ * We can just build locally if it was urgent (aws would probably be back up before that build finished anyway)
